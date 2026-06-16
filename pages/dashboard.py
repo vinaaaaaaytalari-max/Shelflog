@@ -1,362 +1,197 @@
-import streamlit as st
-import pandas as pd
-import sqlite3
-import plotly.express as px
-from datetime import datetime
+import sys
+from pathlib import Path
 
-# -----------------------------
-# PAGE CONFIG
-# -----------------------------
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+import streamlit as st
+from i18n import t
+
 st.set_page_config(
-    page_title="Dashboard",
+    page_title=t("dashboard_title"),
     page_icon="📊",
     layout="wide"
 )
 
-st.title("📊 Smart Inventory Dashboard")
-st.caption("Real-time overview of inventory, sales, and business performance.")
+st.title(t("dashboard_title"))
+st.caption(t("dashboard_caption"))
 
-# -----------------------------
-# DATABASE CONNECTION
-# -----------------------------
-conn = sqlite3.connect("inventory.db", check_same_thread=False)
+st.success(t("dashboard_welcome"))
 
-# -----------------------------
-# LOAD DATA
-# -----------------------------
-try:
-    products_df = pd.read_sql_query(
-        "SELECT * FROM products",
-        conn
-    )
-except:
-    products_df = pd.DataFrame()
-
-try:
-    sales_df = pd.read_sql_query(
-        "SELECT * FROM sales",
-        conn
-    )
-except:
-    sales_df = pd.DataFrame()
-
-# -----------------------------
-# CALCULATE METRICS
-# -----------------------------
-total_products = len(products_df)
-
-total_stock = (
-    products_df["stock"].sum()
-    if not products_df.empty
-    else 0
-)
-
-inventory_value = (
-    (products_df["price"] * products_df["stock"]).sum()
-    if not products_df.empty
-    else 0
-)
-
-total_revenue = (
-    sales_df["total_price"].sum()
-    if not sales_df.empty
-    else 0
-)
-
-total_orders = (
-    len(sales_df)
-    if not sales_df.empty
-    else 0
-)
-
-# -----------------------------
-# KPI CARDS
-# -----------------------------
-st.subheader("📌 Business Overview")
-
-col1, col2, col3, col4, col5 = st.columns(5)
-
-col1.metric(
-    "📦 Products",
-    total_products
-)
-
-col2.metric(
-    "🏷 Stock Units",
-    f"{total_stock:,}"
-)
-
-col3.metric(
-    "💰 Revenue",
-    f"₹{total_revenue:,.0f}"
-)
-
-col4.metric(
-    "🧾 Orders",
-    total_orders
-)
-
-col5.metric(
-    "🏦 Inventory Value",
-    f"₹{inventory_value:,.0f}"
-)
-
-# -----------------------------
-# LOW STOCK ALERTS
-# -----------------------------
-st.divider()
-
-col1, col2 = st.columns([2, 1])
+# ---------- KPIs ----------
+col1, col2, col3, col4 = st.columns(4)
 
 with col1:
-
-    st.subheader("⚠ Low Stock Products")
-
-    if not products_df.empty:
-
-        low_stock = products_df[
-            products_df["stock"] <= 10
-        ]
-
-        if len(low_stock) > 0:
-
-            st.dataframe(
-                low_stock[
-                    ["name", "category", "stock"]
-                ],
-                use_container_width=True
-            )
-
-        else:
-            st.success(
-                "All products have sufficient stock."
-            )
+    st.metric(
+        "📦 Products",
+        "345",
+        "+12"
+    )
 
 with col2:
+    st.metric(
+        "👥 Employees",
+        "18",
+        "+2"
+    )
 
-    st.subheader("📉 Stock Summary")
+with col3:
+    st.metric(
+        "🛒 Orders",
+        "1,520",
+        "+8%"
+    )
 
-    if not products_df.empty:
+with col4:
+    st.metric(
+        "💰 Revenue",
+        "₹2,45,000",
+        "+15%"
+    )
 
-        out_stock = len(
-            products_df[
-                products_df["stock"] == 0
-            ]
-        )
-
-        low_stock_count = len(
-            products_df[
-                products_df["stock"] <= 10
-            ]
-        )
-
-        healthy_stock = len(
-            products_df[
-                products_df["stock"] > 10
-            ]
-        )
-
-        st.metric(
-            "Out of Stock",
-            out_stock
-        )
-
-        st.metric(
-            "Low Stock",
-            low_stock_count
-        )
-
-        st.metric(
-            "Healthy Stock",
-            healthy_stock
-        )
-
-# -----------------------------
-# SALES OVERVIEW
-# -----------------------------
 st.divider()
 
-st.subheader("📈 Revenue Trend")
+# ---------- Feature Cards ----------
+left, right = st.columns(2)
 
-if not sales_df.empty:
+with left:
 
-    sales_df["sale_date"] = pd.to_datetime(
-        sales_df["sale_date"]
-    )
+    st.info("""
+### 📦 Inventory Management
 
-    revenue_data = (
-        sales_df.groupby(
-            sales_df["sale_date"].dt.date
-        )["total_price"]
-        .sum()
-        .reset_index()
-    )
+✅ Product Management
 
-    fig = px.line(
-        revenue_data,
-        x="sale_date",
-        y="total_price",
-        markers=True,
-        title="Daily Revenue"
-    )
+✅ Stock Tracking
 
-    st.plotly_chart(
-        fig,
-        use_container_width=True
-    )
+✅ Low Stock Alerts
 
-else:
-    st.info("No sales data available.")
+✅ Product Search
+""")
 
-# -----------------------------
-# INVENTORY DISTRIBUTION
-# -----------------------------
+    st.info("""
+### 🛒 POS Billing
+
+✅ Quick Billing
+
+✅ Receipt Generation
+
+✅ Transaction History
+""")
+
+with right:
+
+    st.info("""
+### 📈 Analytics
+
+✅ Revenue Analysis
+
+✅ Top Products
+
+✅ Sales Trends
+
+✅ Business Insights
+""")
+
+    st.info("""
+### 📑 Reports
+
+✅ Daily Reports
+
+✅ Monthly Reports
+
+✅ Export Reports
+
+✅ Invoice History
+""")
+
 st.divider()
 
-col1, col2 = st.columns(2)
+# ---------- Alerts ----------
+st.subheader("⚠️ Low Stock Alerts")
+
+col1, col2, col3 = st.columns(3)
 
 with col1:
+    st.error("""
+🥛 Milk
 
-    st.subheader("📦 Inventory Levels")
-
-    if not products_df.empty:
-
-        fig = px.bar(
-            products_df,
-            x="name",
-            y="stock",
-            color="stock",
-            title="Current Stock"
-        )
-
-        st.plotly_chart(
-            fig,
-            use_container_width=True
-        )
+Stock Left: 8
+""")
 
 with col2:
+    st.error("""
+🖱 Mouse
 
-    st.subheader("🛒 Product Categories")
+Stock Left: 4
+""")
 
-    if (
-        not products_df.empty
-        and "category" in products_df.columns
-    ):
+with col3:
+    st.warning("""
+🎧 Headphones
 
-        category_counts = (
-            products_df["category"]
-            .value_counts()
-            .reset_index()
-        )
+Stock Left: 9
+""")
 
-        category_counts.columns = [
-            "Category",
-            "Count"
-        ]
-
-        fig = px.pie(
-            category_counts,
-            names="Category",
-            values="Count",
-            title="Products by Category"
-        )
-
-        st.plotly_chart(
-            fig,
-            use_container_width=True
-        )
-
-# -----------------------------
-# TOP SELLERS
-# -----------------------------
 st.divider()
 
-st.subheader("🏆 Top Selling Products")
+# ---------- Quick Access ----------
+st.subheader("🚀 Quick Access")
 
-if (
-    not sales_df.empty
-    and "product_name" in sales_df.columns
-):
-
-    top_products = (
-        sales_df.groupby(
-            "product_name"
-        )["quantity"]
-        .sum()
-        .reset_index()
-        .sort_values(
-            by="quantity",
-            ascending=False
-        )
-        .head(10)
-    )
-
-    fig = px.bar(
-        top_products,
-        x="product_name",
-        y="quantity",
-        text_auto=True,
-        title="Top 10 Selling Products"
-    )
-
-    st.plotly_chart(
-        fig,
-        use_container_width=True
-    )
-
-# -----------------------------
-# RECENT SALES
-# -----------------------------
-st.divider()
-
-st.subheader("🧾 Recent Transactions")
-
-if not sales_df.empty:
-
-    recent_sales = sales_df.sort_values(
-        by="sale_date",
-        ascending=False
-    )
-
-    st.dataframe(
-        recent_sales.head(10),
-        use_container_width=True
-    )
-
-else:
-    st.info("No transactions available.")
-
-# -----------------------------
-# QUICK ACTIONS
-# -----------------------------
-st.divider()
-
-st.subheader("🚀 Quick Actions")
-
-c1, c2, c3 = st.columns(3)
+c1, c2, c3, c4 = st.columns(4)
 
 with c1:
-    st.info(
-        "➕ Add new products from Inventory page."
-    )
+    if st.button(t("quick_access_inventory")):
+        st.switch_page("pages/inventory.py")
 
 with c2:
-    st.info(
-        "💳 Create sales using POS page."
-    )
+    if st.button(t("quick_access_employees")):
+        st.switch_page("pages/staff.py")
 
 with c3:
-    st.info(
-        "📊 View detailed reports in Analytics page."
-    )
+    if st.button(t("quick_access_analytics")):
+        st.switch_page("pages/analytics.py")
 
-# -----------------------------
-# FOOTER
-# -----------------------------
+with c4:
+    if st.button(t("quick_access_voice")):
+        st.switch_page("pages/voice_search.py")
+
 st.divider()
 
-st.caption(
-    f"Last Updated: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}"
-)
+# ---------- Recent Activity ----------
+st.subheader("📋 Recent Activity")
 
-conn.close()
+st.success("✅ Invoice #1254 generated successfully")
+
+st.success("✅ Rice stock updated (+50 units)")
+
+st.warning("⚠️ Milk stock running low")
+
+st.info("🎙 Voice search used: 'Search Laptop'")
+
+st.success("✅ New employee added")
+
+st.divider()
+
+# ---------- Summary ----------
+st.subheader("📌 Today's Summary")
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    st.metric(
+        "Invoices Generated",
+        "125"
+    )
+
+with col2:
+    st.metric(
+        "Transactions",
+        "302"
+    )
+
+with col3:
+    st.metric(
+        "Voice Searches",
+        "47"
+    )
+
+st.caption("© 2026 Shelflog • Smart Inventory & POS Management")

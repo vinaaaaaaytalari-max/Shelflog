@@ -1,268 +1,174 @@
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 import streamlit as st
 import pandas as pd
-import sqlite3
 import plotly.express as px
+from i18n import t
 
-# -----------------------------
-# PAGE CONFIG
-# -----------------------------
-st.set_page_config(page_title="Analytics", page_icon="📊", layout="wide")
+st.set_page_config(layout="wide")
 
-st.title("📊 Business Analytics Dashboard")
-st.markdown("Track sales, inventory performance, and business insights.")
+st.title(t("analytics_title"))
+st.caption(t("analytics_caption"))
 
-# -----------------------------
-# DATABASE CONNECTION
-# -----------------------------
-conn = sqlite3.connect("inventory.db", check_same_thread=False)
+# ------------------------
+# KPI CARDS
+# ------------------------
+c1, c2, c3, c4 = st.columns(4)
 
-# -----------------------------
-# LOAD DATA
-# -----------------------------
-try:
-    sales_df = pd.read_sql_query("SELECT * FROM sales", conn)
-except:
-    sales_df = pd.DataFrame()
+c1.metric("💰 Revenue", "₹2,45,000", "+15%")
+c2.metric("🛒 Orders", "1,520", "+8%")
+c3.metric("🧾 Invoices", "1,245", "+11%")
+c4.metric("⚠️ Low Stock Items", "12", "-3")
 
-try:
-    products_df = pd.read_sql_query("SELECT * FROM products", conn)
-except:
-    products_df = pd.DataFrame()
-
-# -----------------------------
-# KPI SECTION
-# -----------------------------
-st.subheader("📌 Key Performance Indicators")
-
-if not sales_df.empty:
-
-    total_sales = sales_df["total_price"].sum()
-    total_orders = len(sales_df)
-
-    avg_order_value = (
-        total_sales / total_orders if total_orders > 0 else 0
-    )
-
-    col1, col2, col3 = st.columns(3)
-
-    col1.metric(
-        "💰 Total Revenue",
-        f"₹{total_sales:,.2f}"
-    )
-
-    col2.metric(
-        "🧾 Total Orders",
-        total_orders
-    )
-
-    col3.metric(
-        "📦 Avg Order Value",
-        f"₹{avg_order_value:,.2f}"
-    )
-
-else:
-    st.warning("No sales data available.")
-
-# -----------------------------
-# SALES TREND
-# -----------------------------
 st.divider()
 
-st.subheader("📈 Sales Trend")
+# ------------------------
+# REVENUE TREND
+# ------------------------
+sales = pd.DataFrame({
+    "Month": ["Jan","Feb","Mar","Apr","May","Jun"],
+    "Revenue": [120000,145000,170000,190000,220000,245000]
+})
 
-if not sales_df.empty:
+fig1 = px.line(
+    sales,
+    x="Month",
+    y="Revenue",
+    markers=True,
+    title="Monthly Revenue Trend"
+)
 
-    if "sale_date" in sales_df.columns:
+# ------------------------
+# CATEGORY SALES
+# ------------------------
+category = pd.DataFrame({
+    "Category":["Groceries","Electronics","Stationery","Fashion"],
+    "Sales":[40,30,20,10]
+})
 
-        sales_df["sale_date"] = pd.to_datetime(
-            sales_df["sale_date"]
-        )
+fig2 = px.pie(
+    category,
+    values="Sales",
+    names="Category",
+    hole=0.55,
+    title="Sales Distribution"
+)
 
-        daily_sales = (
-            sales_df.groupby(
-                sales_df["sale_date"].dt.date
-            )["total_price"]
-            .sum()
-            .reset_index()
-        )
+left, right = st.columns(2)
 
-        fig = px.line(
-            daily_sales,
-            x="sale_date",
-            y="total_price",
-            markers=True,
-            title="Daily Revenue"
-        )
+with left:
+    st.plotly_chart(fig1, use_container_width=True)
 
-        st.plotly_chart(
-            fig,
-            use_container_width=True
-        )
+with right:
+    st.plotly_chart(fig2, use_container_width=True)
 
-# -----------------------------
-# TOP SELLING PRODUCTS
-# -----------------------------
 st.divider()
 
-st.subheader("🏆 Top Selling Products")
+# ------------------------
+# TOP PRODUCTS
+# ------------------------
+st.subheader("🔥 Top Selling Products")
 
-if not sales_df.empty:
+products = pd.DataFrame({
+    "Product":["Rice","Milk","Laptop","Mouse","Soap"],
+    "Units Sold":[320,290,160,140,100]
+})
 
-    if "product_name" in sales_df.columns:
+fig3 = px.bar(
+    products,
+    x="Product",
+    y="Units Sold",
+    color="Units Sold",
+    text_auto=True
+)
 
-        top_products = (
-            sales_df.groupby("product_name")
-            ["quantity"]
-            .sum()
-            .reset_index()
-            .sort_values(
-                by="quantity",
-                ascending=False
-            )
-            .head(10)
-        )
+st.plotly_chart(fig3, use_container_width=True)
 
-        fig = px.bar(
-            top_products,
-            x="product_name",
-            y="quantity",
-            title="Top Selling Products",
-            text_auto=True
-        )
+# ------------------------
+# FEATURE PERFORMANCE
+# ------------------------
+st.subheader("🚀 Feature Usage")
 
-        st.plotly_chart(
-            fig,
-            use_container_width=True
-        )
+a, b, c = st.columns(3)
 
-# -----------------------------
-# CATEGORY PERFORMANCE
-# -----------------------------
+with a:
+    st.info("🛒 POS Billing")
+    st.metric("Transactions", "3,120")
+    st.progress(92)
+
+with b:
+    st.info("🧾 Invoice Generation")
+    st.metric("Invoices", "1,245")
+    st.progress(85)
+
+with c:
+    st.info("🎙 Voice Search")
+    st.metric("Voice Searches", "458")
+    st.progress(68)
+
 st.divider()
 
-st.subheader("🛒 Category Performance")
+# ------------------------
+# LOW STOCK ALERTS
+# ------------------------
+st.subheader("⚠️ Low Stock Alerts")
 
-if (
-    not sales_df.empty
-    and not products_df.empty
-    and "product_name" in sales_df.columns
-    and "name" in products_df.columns
-):
+low_stock = pd.DataFrame({
+    "Product":["Milk","Bread","Mouse","Soap"],
+    "Stock":[8,6,4,9]
+})
 
-    merged_df = sales_df.merge(
-        products_df,
-        left_on="product_name",
-        right_on="name",
-        how="left"
-    )
+st.dataframe(low_stock, use_container_width=True)
 
-    if "category" in merged_df.columns:
+# ------------------------
+# REPORT SUMMARY
+# ------------------------
+st.subheader("📑 Report Summary")
 
-        category_sales = (
-            merged_df.groupby("category")
-            ["total_price"]
-            .sum()
-            .reset_index()
-        )
+col1, col2 = st.columns(2)
 
-        fig = px.pie(
-            category_sales,
-            names="category",
-            values="total_price",
-            title="Revenue by Category"
-        )
+with col1:
+    st.success("""
+### Inventory
 
-        st.plotly_chart(
-            fig,
-            use_container_width=True
-        )
+✅ 345 Products
 
-# -----------------------------
-# INVENTORY STATUS
-# -----------------------------
+✅ 27 Restocked
+
+⚠️ 12 Low Stock
+""")
+
+with col2:
+    st.success("""
+### Sales
+
+💰 Revenue +15%
+
+🛒 1,520 Orders
+
+📈 Growth Trend Positive
+""")
+
 st.divider()
 
-st.subheader("📦 Inventory Status")
+# ------------------------
+# AI INSIGHTS
+# ------------------------
+st.subheader("🤖 Smart Insights")
 
-if not products_df.empty:
+st.success("""
+✅ Revenue increased by 15%.
 
-    if "stock" in products_df.columns:
+✅ Groceries are the best-selling category.
 
-        fig = px.bar(
-            products_df,
-            x="name",
-            y="stock",
-            title="Current Inventory Levels",
-            color="stock"
-        )
+✅ Milk and Bread require immediate restocking.
 
-        st.plotly_chart(
-            fig,
-            use_container_width=True
-        )
+✅ POS billing activity is strong.
 
-# -----------------------------
-# LOW STOCK PRODUCTS
-# -----------------------------
-st.divider()
+✅ Voice search usage continues to rise.
 
-st.subheader("⚠️ Low Stock Alert")
-
-if not products_df.empty:
-
-    low_stock = products_df[
-        products_df["stock"] <= 10
-    ]
-
-    if len(low_stock) > 0:
-
-        st.dataframe(
-            low_stock[
-                ["name", "category", "stock"]
-            ],
-            use_container_width=True
-        )
-
-    else:
-        st.success(
-            "All products have sufficient stock."
-        )
-
-# -----------------------------
-# SALES TABLE
-# -----------------------------
-st.divider()
-
-st.subheader("📄 Recent Sales")
-
-if not sales_df.empty:
-
-    st.dataframe(
-        sales_df.sort_index(
-            ascending=False
-        ).head(20),
-        use_container_width=True
-    )
-
-else:
-    st.info("No sales records found.")
-
-# -----------------------------
-# DOWNLOAD REPORT
-# -----------------------------
-st.divider()
-
-st.subheader("⬇ Export Sales Report")
-
-if not sales_df.empty:
-
-    csv = sales_df.to_csv(index=False)
-
-    st.download_button(
-        label="Download Sales Report",
-        data=csv,
-        file_name="sales_report.csv",
-        mime="text/csv"
-    )
-
-conn.close()
+✅ Inventory turnover remains healthy.
+""")

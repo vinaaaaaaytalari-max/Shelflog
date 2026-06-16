@@ -1,343 +1,144 @@
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 import streamlit as st
 import pandas as pd
-import sqlite3
-import os
-from PIL import Image
-
-# ----------------------------------
-# PAGE CONFIG
-# ----------------------------------
-st.set_page_config(
-    page_title="Inventory Management",
-    page_icon="📦",
-    layout="wide"
-)
-
-st.title("📦 Inventory Management")
-
-# ----------------------------------
-# DATABASE
-# ----------------------------------
-conn = sqlite3.connect("inventory.db", check_same_thread=False)
-cursor = conn.cursor()
-
-# Create table if not exists
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS products(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT,
-    category TEXT,
-    price REAL,
-    stock INTEGER,
-    image TEXT
-)
-""")
-conn.commit()
-
-# ----------------------------------
-# IMAGE FOLDER
-# ----------------------------------
-IMAGE_FOLDER = "product_images"
-
-if not os.path.exists(IMAGE_FOLDER):
-    os.makedirs(IMAGE_FOLDER)
-
-# ----------------------------------
-# ADD PRODUCT
-# ----------------------------------
-st.subheader("➕ Add New Product")
-
-with st.form("add_product_form"):
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        product_name = st.text_input("Product Name")
-
-        category = st.selectbox(
-            "Category",
-            [
-                "Groceries",
-                "Electronics",
-                "Fashion",
-                "Stationery",
-                "Home Items",
-                "Other"
-            ]
-        )
-
-    with col2:
-        price = st.number_input(
-            "Price",
-            min_value=0.0,
-            step=1.0
-        )
-
-        stock = st.number_input(
-            "Stock Quantity",
-            min_value=0,
-            step=1
-        )
-
-    image_file = st.file_uploader(
-        "Upload Product Image",
-        type=["jpg", "jpeg", "png"]
-    )
-
-    submit = st.form_submit_button("Add Product")
-
-    if submit:
-
-        image_path = ""
-
-        if image_file:
-
-            image_path = os.path.join(
-                IMAGE_FOLDER,
-                image_file.name
-            )
-
-            with open(image_path, "wb") as f:
-                f.write(image_file.getbuffer())
-
-        cursor.execute("""
-            INSERT INTO products
-            (name, category, price, stock, image)
-            VALUES (?, ?, ?, ?, ?)
-        """,
-        (
-            product_name,
-            category,
-            price,
-            stock,
-            image_path
-        ))
-
-        conn.commit()
-
-        st.success("Product Added Successfully!")
-
-# ----------------------------------
-# VIEW INVENTORY
-# ----------------------------------
-st.divider()
-
-st.subheader("📋 Inventory List")
-
-df = pd.read_sql_query(
-    "SELECT * FROM products",conn)
-
-if df.empty:
-    st.warning("No products available.")
-else:
-
-    # Search
-    search = st.text_input(
-        "🔍 Search Product"
-    )
-
-    if search:
-        df = df[
-            df["name"]
-            .str.contains(
-                search,
-                case=False,
-                na=False
-            )
-        ]
-
-    st.dataframe(
-        df,
-        use_container_width=True
-    )
-
-# ----------------------------------
-# PRODUCT CARDS
-# ----------------------------------
-st.divider()
-
-st.subheader("🛒 Product Gallery")
-
-products = pd.read_sql_query(
-    "SELECT * FROM products",
-    conn
-)
-
-if not products.empty:
-
-    cols = st.columns(3)
-
-    for index, product in enumerate(products.to_dict(orient="records")):
-
-        with cols[index % 3]:
-
-            img_path = product.get("image", "")
-
-            if img_path and os.path.exists(img_path):
-
-                st.image(
-                    img_path,
-                    use_container_width=True
-                )
-
-            st.markdown(f"### {product.get('name','')}")
-
-            st.write(f"Category: {product.get('category','')}")
-
-            st.write(f"Price: ₹{product.get('price','')}")
-
-            st.write(f"Stock: {product.get('stock','')}")
-
-# ----------------------------------
-# UPDATE STOCK
-# ----------------------------------
-st.divider()
-
-st.subheader("✏ Update Stock")
-
-product_names = products["name"].tolist()
-
-if product_names:
-
-    selected_product = st.selectbox(
-        "Select Product",
-        product_names
-    )
-
-    new_stock = st.number_input(
-        "New Stock Quantity",
-        min_value=0,
-        step=1
-    )
-
-    if st.button("Update Stock"):
-
-        cursor.execute("""
-            UPDATE products
-            SET stock = ?
-            WHERE name = ?
-        """,
-        (
-            new_stock,
-            selected_product
-        ))
-
-        conn.commit()
-
-        st.success(
-            "Stock Updated Successfully!"
-        )
-
-# ----------------------------------
-# DELETE PRODUCT
-# ----------------------------------
-st.divider()
-
-st.subheader("🗑 Delete Product")
-
-if product_names:
-
-    delete_product = st.selectbox(
-        "Choose Product to Delete",
-        product_names,
-        key="delete"
-    )
-
-    if st.button("Delete Product"):
-
-        cursor.execute("""
-            DELETE FROM products
-            WHERE name = ?
-        """,
-        (delete_product,)
-        )
-
-        conn.commit()
-
-        st.success(
-            "Product Deleted Successfully!"
-        )
-
-        st.rerun()
-
-# ----------------------------------
-# LOW STOCK ALERTS
-# ----------------------------------
-st.divider()
-
-st.subheader("⚠ Low Stock Alert")
-
-low_stock = products[
-    products["stock"] <= 10
+from i18n import t
+
+st.title(t("inventory_title"))
+st.caption(t("inventory_caption"))
+
+if "products" not in st.session_state:
+    st.session_state.products = []
+
+# Search
+search = st.text_input(t("search_products"))
+
+# Products
+products = [
+    {"name":"Rice","price":60,"stock":120,"image":"https://images.unsplash.com/photo-1586201375761-83865001e31c?w=500"},
+    {"name":"Milk","price":35,"stock":8,"image":"https://images.unsplash.com/photo-1550583724-b2692b85b150?w=500"},
+    {"name":"Bread","price":40,"stock":15,"image":"https://images.unsplash.com/photo-1509440159596-0249088772ff?w=500"},
+    {"name":"Eggs","price":90,"stock":30,"image":"https://images.unsplash.com/photo-1518569656558-1f25e69d93d7?w=500"},
+    {"name":"Coffee","price":350,"stock":20,"image":"https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=500"},
+    {"name":"Tea","price":220,"stock":28,"image":"https://images.unsplash.com/photo-1544787219-7f47ccb76574?w=500"},
+    {"name":"Soap","price":50,"stock":25,"image":"https://images.unsplash.com/photo-1584305574647-acf8069a3d3d?w=500"},
+    {"name":"Laptop","price":55000,"stock":15,"image":"https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=500"},
+    {"name":"Mouse","price":799,"stock":4,"image":"https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?w=500"},
+    {"name":"Keyboard","price":1499,"stock":18,"image":"https://images.unsplash.com/photo-1511467687858-23d96c32e4ae?w=500"},
+    {"name":"Headphones","price":2499,"stock":9,"image":"https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500"},
+    {"name":"Smartphone","price":25000,"stock":11,"image":"https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=500"},
+    
 ]
 
-if not low_stock.empty:
+# Search filter
+if search:
+    products = [
+        p for p in products
+        if search.lower() in p["name"].lower()
+    ]
 
-    st.error(
-        f"{len(low_stock)} products are running low!"
-    )
+cols = st.columns(3)
 
-    st.dataframe(
-        low_stock[
-            [
-                "name",
-                "category",
-                "stock"
-            ]
-        ],
-        use_container_width=True
-    )
+for i, product in enumerate(products):
 
-else:
-    st.success(
-        "All products have healthy stock levels."
-    )
+    with cols[i % 3]:
 
-# ----------------------------------
-# INVENTORY SUMMARY
-# ----------------------------------
-st.divider()
+        st.image(product["image"])
 
-st.subheader("📊 Inventory Summary")
+        st.subheader(product["name"])
+
+        st.write(f"💰 ₹{product['price']}")
+        st.write(f"📦 Stock: {product['stock']}")
+
+        # Stock status
+        if product["stock"] > 50:
+            st.success(t("in_stock"))
+
+        elif product["stock"] > 10:
+            st.warning(t("running_low"))
+
+        else:
+            st.error(t("critical_stock"))
+
+        st.progress(min(product["stock"]/100,1.0))
+
+        c1, c2 = st.columns(2)
+
+        with c1:
+            if st.button(t("edit"), key=f"edit{i}"):
+                st.session_state.edit_index = i
+
+        with c2:
+            if st.button(t("delete"), key=f"delete{i}"):
+                products.pop(i)
+                st.rerun()
+
+        st.divider()
+
+# Edit Product Section
+if "edit_index" in st.session_state:
+    idx = st.session_state.edit_index
+
+    with st.expander("✏️ " + t("edit"), expanded=True):
+        new_name = st.text_input(
+            t("product_name"),
+            value=products[idx]["name"]
+        )
+        new_price = st.number_input(
+            t("price"),
+            value=products[idx]["price"]
+        )
+        new_stock = st.number_input(
+            t("stock_quantity"),
+            value=products[idx]["stock"]
+        )
+
+        if st.button("💾 " + t("add_product_button")):
+            products[idx]["name"] = new_name
+            products[idx]["price"] = new_price
+            products[idx]["stock"] = new_stock
+
+            del st.session_state.edit_index
+            st.success("✅ " + t("product_added").format(name=new_name))
+            st.rerun()
+
+# Add Product Section
+st.markdown("---")
+
+st.subheader(t("add_product"))
 
 col1, col2, col3 = st.columns(3)
 
-total_products = len(products)
+with col1:
+    name = st.text_input(t("product_name"), placeholder=t("product_name"))
 
-total_stock = products["stock"].sum()
+with col2:
+    price = st.number_input(
+        t("price"),
+        min_value=0
+    )
 
-inventory_value = (
-    products["price"] *
-    products["stock"]
-).sum()
+with col3:
+    stock = st.number_input(
+        t("stock_quantity"),
+        min_value=0
+    )
+if st.button(t("add_product_button")):
+    st.session_state.products.append({
+        "Name": name,
+        "Price": price,
+        "Stock": stock
+    })
+    st.success(t("product_added").format(name=name))
 
-col1.metric(
-    "Products",
-    total_products
-)
+st.markdown("---")
 
-col2.metric(
-    "Stock Units",
-    total_stock
-)
+st.subheader("Current Products")
 
-col3.metric(
-    "Inventory Value",
-    f"₹{inventory_value:,.0f}"
-)
-
-# ----------------------------------
-# DOWNLOAD INVENTORY
-# ----------------------------------
-st.divider()
-
-csv = products.to_csv(index=False)
-
-st.download_button(
-    label="⬇ Download Inventory CSV",
-    data=csv,
-    file_name="inventory.csv",
-    mime="text/csv"
-)
-
-conn.close()
+if st.session_state.products:
+    st.dataframe(pd.DataFrame(st.session_state.products), width='stretch')
+else:
+    st.info(t("no_products"))

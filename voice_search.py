@@ -15,6 +15,18 @@ st.set_page_config(
 st.title("🎤 AI Voice Product Search")
 st.caption("Search inventory products using your voice.")
 
+# Language selector (supports English, Hindi, Telugu, Punjabi)
+language = st.selectbox(
+    "Language",
+    [
+        "en-IN",
+        "hi-IN",
+        "te-IN",
+        "pa-IN",
+    ],
+    index=0,
+)
+
 # -------------------------------------
 # DATABASE
 # -------------------------------------
@@ -52,7 +64,8 @@ def listen_to_voice():
     try:
 
         text = recognizer.recognize_google(
-            audio
+            audio,
+            language=language
         )
 
         return text
@@ -95,7 +108,7 @@ if st.button("🎤 Start Voice Search"):
 
             st.dataframe(
                 results,
-                use_container_width=True
+                width='stretch'
             )
 
         else:
@@ -134,7 +147,7 @@ if query:
 
     st.dataframe(
         results,
-        use_container_width=True
+        width='stretch'
     )
 
 # -------------------------------------
@@ -146,7 +159,7 @@ st.subheader("📋 Available Products")
 
 st.dataframe(
     products_df,
-    use_container_width=True
+    width='stretch'
 )
 
 conn.close()
